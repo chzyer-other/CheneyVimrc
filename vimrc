@@ -1,7 +1,8 @@
 " python 初始化
 python << EOF
 import imp
-vimlib = imp.load_source('vimlib', '/Users/cheney/.vim/vimlib.py')
+import sys
+vimlib = imp.load_source('vimlib', '%s/vimlib.py' % sys.path[-1])
 EOF
 
 set ts=4 " 设置缩进格式为4个空格
