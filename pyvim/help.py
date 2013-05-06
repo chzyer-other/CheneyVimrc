@@ -3,9 +3,9 @@ import vimlib
 import os
 import re
 
-def help_go(buf):
+def help_go(method, buf):
 	lib = vimlib.LoadLibrary("help_go_util")[0]
-	lib.run(buf)
+	lib.run(method, buf)
 
 def aa():
 	if buf.strip().startswith('"') and buf.strip().endswith('"'):

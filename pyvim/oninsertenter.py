@@ -25,6 +25,9 @@ def oninsertenter_py():
 def oninsertenter_php():
 	oninsertenter_go()
 
+def oninsertenter_c():
+	oninsertenter_go()
+
 intent_char = None
 def oninsertenter_go():
 	global intent_char

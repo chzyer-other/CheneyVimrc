@@ -2,7 +2,8 @@
 python << EOF
 import imp
 import sys
-vimlib = imp.load_source('vimlib', '%s/vimlib.py' % sys.path[-1])
+import os
+vimlib = imp.load_source('vimlib', '%s/.vim/vimlib.py' % os.environ['HOME'])
 EOF
 
 set ts=4 " 设置缩进格式为4个空格
@@ -49,6 +50,7 @@ imap <S-cr> <Esc>o
 map <D-[> <C-w>h
 map <D-]> <C-w>l
 map <D-k> :call Help()<cr>
+map <D-K> :call HelpFinder()<cr>
 imap <D-L> <End>
 imap <D-H> <Esc>I
 inoremap <D-u> <C-n>
@@ -132,6 +134,12 @@ endfunction
 function! JTest()
 python << EOF
 vimlib.JTest()
+EOF
+endfunction
+
+function! HelpFinder()
+python << EOF
+vimlib.HelpFinder()
 EOF
 endfunction
 

@@ -15,6 +15,12 @@ def run_cpp(remote, arg, other):
 	command = [command]
 	command.extend(other)
 	vim.command('!%s' % " && ".join(command))
+	
+def run_c(remote, arg, other):
+	vim.command("w")
+	name = vimlib.GetCurrentFileNameWithoutSuffix()
+	vim.command('!gcc -o %s %% && ./%s' % (name, name))
+	
 
 def run_yml(remote, arg, other):
 	vim.command('w')

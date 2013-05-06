@@ -1,9 +1,13 @@
+import os
+
+for i in os.environ:
+	print i, os.environ[i]
 import vim
 import imp
-import os
-home = "/Users/cheney"
+home = os.environ['HOME']
+
 GOROOT = "/usr/local/go"
-GOPATH = os.environ["GOPATH"].split(":")
+GOPATH = os.environ.get("GOPATH", "").split(":")
 GOPATH.append(GOROOT)
 
 def AddQuote():
@@ -66,13 +70,16 @@ def Run():
 	arg, other = GetRunArgument()
 	func(GetCurrentPath().startswith("/Volumes/"), arg, other)
 
-def Help():
+def Help(method="tabnew"):
 	suffix = GetCurrentFileSuffix()
 	func, ok = LoadLibraryFunc('help', suffix)
 	if not ok:
 		error("filetype of '%s' is not supported for help" % suffix)
 		return
-	func(GetCurrentCursorLineAll())
+	func(method, GetCurrentCursorLineAll())
+
+def HelpFinder():
+	return Help("!open")
 
 def Build():
 	''' build the file '''
