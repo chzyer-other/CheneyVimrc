@@ -9,13 +9,34 @@ def run(m, buf):
 	cursor = vim.current.window.cursor
 	if cursor[0] > s and cursor[0] <= e:
 		''' 指针在 import 内 '''
-		print "in import"
+		l = vimlib.GetCurrentCursorLine()
+		l = l[l.find('"')+1: l.rfind('"')]
+		vim.command("%s %s" % (m, getPackageDirPath(l)))
 		return
 	
 	funcs = getFuncsFromCur()
-	makeFuncsName(vim.current.buffer)
+	if len(funcs) == 0:
+		return
 	path = findPackage(funcs[0])
 	if path is None:
+		for path, _, filenames in os.walk("."):
+			for filename in filenames:
+				if not isFileNameMatch(filename):
+					continue
+				buf = filepathToBuffer(filename)
+				openmethod = m
+				if filename == vimlib.GetCurrentFileName():
+					openmethod = "" 
+					filename=""
+
+				ret = findTypeInBuffer(funcs[0], buf, filename)
+				if ret is not None:
+					openFileAndLine(openmethod, ret[0], ret[1])
+					return
+				
+				ret = findFuncInBuffer("", funcs[0], buf, filename)
+				if ret is not None:
+					openFileAndLine(openmethod, ret[0], ret[1])
 		return
 	if len(funcs) == 1:
 		''' only package '''
@@ -25,13 +46,15 @@ def run(m, buf):
 	filename, lino = findFuncInPath(path, funcs[1])
 
 	if lino is None:
-		filename, lino = findStructInPath(path, funcs[1])
+		filename, lino = findTypeInPath(path, funcs[1])
+	
+	if lino is None:
+		filename, lino = findVar(path, funcs[1])
 		
 	if lino is not None:
 		openFileAndLine(m, filename, lino)
 		return
-	
-	# print findVar(path, funcs[1])
+
 	print path, funcs
 	print "can't find reference"
 
@@ -44,54 +67,84 @@ def findVar(fpath, varName):
 			f.close()
 			
 			vals = makeValName(data)
+			line = [i[0] for i in vals if i[1] == varName]
+			if len(line) == 1:
+				return path, line[0]
+			
 	return None, None
 
+def isFileNameMatch(filename):
+	return filename.endswith(".go")
+
+def filepathToBuffer(filepath):
+	f = open(filepath, "r")
+	data = f.read().split("\n")
+	f.close()
+	return data
+
 def makeValName(data):
+	rets = []
 	r = re.compile(r"var ([\w\d_]+)")
 	for i in range(0, len(data)):
 		line = data[i]
 		if not line.startswith('var'):
 			continue
-		print line
-			
+		line = line[4:]
+		line = line[: line.find(" ")]
+		rets.append((i, line))
+	return rets
 
-def findStructInPath(fpath, typeName):
+def findTypeInPath(fpath, typeName):
 	for p, _, dirs in os.walk(fpath):
 		for d in dirs:
 			path = "%s/%s" % (p, d)
-			f = open(path, "r")
-			data = f.read().split("\n")
-			f.close()
+			data = filepathToBuffer(path)
 			
-			types = makeTypeName(data)
-			line = [i[0] for i in types if i[1] == typeName]
-			if len(line) == 1:
-				return path, line[0]
+			ret = findTypeInBuffer(typeName, data, path)
+			if ret is None:
+				continue
+			return ret
 	return None, None
+
+def findTypeInBuffer(typeName, data, path=""):
+	types = makeTypeName(data)
+	line = [i[0] for i in types if i[1] == typeName]
+	if len(line) == 1:
+		return path, line[0]
+	return None
 
 def findFuncInPath(fpath, funcname, rectr=""):
 	for p, _, dirs in os.walk(fpath):
 		for d in dirs:
-			 path = "%s/%s" % (p, d)
-			 f = open(path, "r")
-			 data = f.read().split("\n")
-			 f.close()
-			 f = makeFuncsName(data)
-			 if f is None:
-			 	continue
-			 funcs = f.get(rectr, None)
-			 if funcs is None:
-			 	continue
-			 line = [i[0] for i in funcs if i[1] == funcname]
-			 if len(line) == 1:
-			 	return path, line[0]
+			if not isFileNameMatch(d):
+				continue
+			path = "%s/%s" % (p, d)
+			f = open(path, "r")
+			data = f.read().split("\n")
+			f.close()
+			ret = findFuncInBuffer(rectr, funcname, data, path)
+			if ret is None:
+				continue
+			return ret
 			 	
 	return None, None
 
-def makeTypeName(buffer):
+def findFuncInBuffer(rectr, funcname, buffer, path=""):
+	f = makeFuncsName(buffer)
+	if f is None:
+		return None
+	funcs = f.get(rectr, None)
+	if funcs is None:
+		return None
+	line = [i[0] for i in funcs if i[1] == funcname]
+	if len(line) == 1:
+		return path, line[0]
+	return None
+
+def makeTypeName(data):
 	names = []
-	for i in range(0, len(buffer)):
-		line = buffer[i]
+	for i in range(0, len(data)):
+		line = data[i]
 		if not line.startswith("type "):
 			continue
 		
@@ -172,10 +225,11 @@ def getImportLineNoRange():
 
 def openFileAndLine(method, filePath, lineNo):
 	''' 打开指定文件并跳转到行号 '''
-	
 	cmd = "%s %s" % (method, filePath)
-	vim.command(cmd)
+	if cmd.strip():
+		vim.command(cmd)
 	vim.command("%s" % (lineNo + 1))
+	vim.press("zz")
 
 def getFuncsFromCur():
 	''' 将指针所指向的一系列命令进行格式化 '''
@@ -203,4 +257,11 @@ def getFuncsFromCur():
 		if len(r) > 0:
 			r[0] += buf[i]
 	r = r[::-1]
+	for i in range(0, len(r)):
+		c = r[i]
+		if c.startswith("[]"):
+			c = c[2:]
+		if c.startswith("*"):
+			c = c[1:]
+		r[i] = c
 	return r

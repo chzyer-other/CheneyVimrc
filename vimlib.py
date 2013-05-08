@@ -79,7 +79,8 @@ def Help(method="tabnew"):
 	func(method, GetCurrentCursorLineAll())
 
 def HelpFinder():
-	return Help("!open")
+	Help("!open")
+	vim.press("\<Esc>")
 
 def Build():
 	''' build the file '''
