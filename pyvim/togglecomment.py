@@ -11,6 +11,9 @@ def togglecomment_php():
 def togglecomment_go():
 	togglecomment_module("//")
 
+def togglecomment_sh():
+	togglecomment_module("#")
+
 def togglecomment_py():
 	togglecomment_module("#")
 

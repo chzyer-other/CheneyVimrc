@@ -5,8 +5,8 @@ set cpo&vim
 imap <S-CR> o
 map  <BS>
 vmap 	 I	
-nmap 	 i	
-omap 	 i	
+nmap 	 I	
+omap 	 I	
 noremap  o
 noremap   a h
 noremap " a""<Left>
@@ -16,6 +16,7 @@ map <D-e> :w:call Test()
 map <D-V> :w:source $MYVIMRC
 map <D-B> :call Build()
 map <D-/> :call ToggleComment()
+map <D-K> :call HelpFinder()
 map <D-k> :call Help()
 map <D-]> l
 map <D-[> h
@@ -23,15 +24,16 @@ map <D-O> s
 map <D-r> :call Run()
 noremap _ :call AddScore()
 nmap gx <Plug>NetrwBrowseX
+imap ／ /
 map tl xph
 map th hxp
 nnoremap <silent> <Plug>NetrwBrowseX :call netrw#NetrwBrowseX(expand("<cWORD>"),0)
 noremap <S-Space> i l
 map <S-BS> x
 map <BS> X
-vmap <S-Tab> x
-nmap <S-Tab> x
-omap <S-Tab> x
+vmap <S-Tab> I<Del>
+nmap <S-Tab> I<Del>
+omap <S-Tab> I<Del>
 inoremap  <Home>
 inoremap  <Left>
 inoremap  <Del>
@@ -56,6 +58,9 @@ set autochdir
 set backspace=2
 set fileencodings=ucs-bom,utf-8,default,latin1
 set helplang=en
+set hlsearch
+set listchars=tab:⋮\ ,nbsp:·,trail:·
+set nomodeline
 set modelines=0
 set noswapfile
 set tabstop=4
@@ -63,14 +68,14 @@ set window=0
 let s:so_save = &so | let s:siso_save = &siso | set so=0 siso=0
 let v:this_session=expand("<sfile>:p")
 silent only
-cd ~/Projects/qiniu/ffmpeg
+cd /private/etc
 if expand('%') == '' && !&modified && line('$') <= 1 && getline(1) == ''
   let s:wipebuf = bufnr('%')
 endif
 set shortmess=aoO
-badd +0 ~/Projects/qiniu/ffmpeg/Makefile
-args Makefile
-edit ~/Projects/qiniu/ffmpeg/Makefile
+badd +0 /private/etc/hosts
+args hosts
+edit /private/etc/hosts
 set splitbelow splitright
 set nosplitbelow
 set nosplitright
@@ -103,8 +108,8 @@ setlocal nodiff
 setlocal equalprg=
 setlocal errorformat=
 setlocal noexpandtab
-if &filetype != 'make'
-setlocal filetype=make
+if &filetype != 'conf'
+setlocal filetype=conf
 endif
 setlocal foldcolumn=0
 setlocal foldenable
@@ -131,10 +136,11 @@ setlocal iskeyword=@,48-57,_,192-255
 setlocal keywordprg=
 setlocal nolinebreak
 setlocal nolisp
-setlocal nolist
+set list
+setlocal list
 setlocal makeprg=
 setlocal matchpairs=(:),{:},[:]
-setlocal modeline
+setlocal nomodeline
 setlocal modifiable
 setlocal nrformats=octal,hex
 set number
@@ -160,8 +166,8 @@ setlocal statusline=
 setlocal suffixesadd=
 setlocal noswapfile
 setlocal synmaxcol=3000
-if &syntax != 'make'
-setlocal syntax=make
+if &syntax != 'conf'
+setlocal syntax=conf
 endif
 setlocal tabstop=4
 setlocal tags=
@@ -173,11 +179,11 @@ setlocal nowinfixwidth
 setlocal wrap
 setlocal wrapmargin=0
 silent! normal! zE
-let s:l = 24 - ((22 * winheight(0) + 12) / 24)
+let s:l = 18 - ((17 * winheight(0) + 26) / 53)
 if s:l < 1 | let s:l = 1 | endif
 exe s:l
 normal! zt
-24
+18
 normal! 0
 tabnext 1
 if exists('s:wipebuf')

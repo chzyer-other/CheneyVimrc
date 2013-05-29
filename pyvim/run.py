@@ -3,6 +3,8 @@ import vim
 import time
 import os
 
+remote_host = "10.211.55.14"
+
 def run_cpp(remote, arg, other):
 	vim.command('w')
 	d = os.path.dirname(vimlib.GetCurrentPath())
@@ -11,7 +13,7 @@ def run_cpp(remote, arg, other):
 	if remote:
 		path = vimlib.GetCurrentPath()[7: ]
 		path = os.path.dirname(path[path.find('/', 2) + 1:])
-		command = 'ssh 10.211.55.10 "cd %s && make %s"' % (path, arg)
+		command = 'ssh %s "cd %s && make %s"' % (remote_host, path, arg)
 	command = [command]
 	command.extend(other)
 	vim.command('!%s' % " && ".join(command))
@@ -62,7 +64,7 @@ def run_py(remote, arg, other):
 	if remote:
 		path = vimlib.GetCurrentPath()[7: ]
 		path = path[path.find('/', 2) + 1:]
-		command = 'ssh 10.211.55.10 "python %s %s"' % (path, arg)
+		command = 'ssh %s "python %s %s"' % (remote_host, path, arg)
 	
 	command = [command]
 	command.extend(other)

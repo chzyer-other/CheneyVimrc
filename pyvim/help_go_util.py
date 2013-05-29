@@ -5,58 +5,230 @@ import os
 import re
 
 def run(m, buf):
-	s, e = getImportLineNoRange()
 	cursor = vim.current.window.cursor
-	if cursor[0] > s and cursor[0] <= e:
+	if cursor[0] in getNodeLineRange("import"):
 		''' 指针在 import 内 '''
 		l = vimlib.GetCurrentCursorLine()
 		l = l[l.find('"')+1: l.rfind('"')]
 		vim.command("%s %s" % (m, getPackageDirPath(l)))
 		return
-	
+
 	funcs = getFuncsFromCur()
+	ret = findInExec(m, funcs)
+	if ret is None:
+		print "con't find reference"
+		return
+
+	m, filename, lino = ret
+	openFileAndLine(m, filename, lino, funcs[-1])
+
+def findInExec(m, funcs):
+	cursor = vim.current.window.cursor
+	curbuf = vim.current.buffer
+
 	if len(funcs) == 0:
 		return
 	path = findPackage(funcs[0])
 	if path is None:
-		for path, _, filenames in os.walk("."):
-			for filename in filenames:
-				if not isFileNameMatch(filename):
-					continue
-				buf = filepathToBuffer(filename)
-				openmethod = m
-				if filename == vimlib.GetCurrentFileName():
-					openmethod = "" 
-					filename=""
+		ret = findInCurrentPackage(m, funcs)
+		if ret:
+			return ret
+		
+		ret = getTypeOfVarOrFuncArgs(funcs[0])
+		if not isinstance(ret, list):
+			ret = [ret]
+		typenames = ret + funcs[1:]
+		ret = findInExec(m, typenames)
+		return ret
 
-				ret = findTypeInBuffer(funcs[0], buf, filename)
-				if ret is not None:
-					openFileAndLine(openmethod, ret[0], ret[1])
-					return
-				
-				ret = findFuncInBuffer("", funcs[0], buf, filename)
-				if ret is not None:
-					openFileAndLine(openmethod, ret[0], ret[1])
-		return
 	if len(funcs) == 1:
 		''' only package '''
-		vim.command("%s %s" % (m, path))
-		return
-	
-	filename, lino = findFuncInPath(path, funcs[1])
+		return m, path, None
 
-	if lino is None:
-		filename, lino = findTypeInPath(path, funcs[1])
+	ret = findAllFuncs(path, funcs[1: ])
+	if ret is not None:
+		# return
+		return [m] + ret
 	
-	if lino is None:
-		filename, lino = findVar(path, funcs[1])
-		
-	if lino is not None:
-		openFileAndLine(m, filename, lino)
-		return
+def findAllFuncs(path, funcs):
+	ret = None
+	if len(funcs) == 2:
+		ret = findAllInPath(path, ".".join(funcs), ["tfunc"])
+		if ret is None:
+			ret = findAllInPath(path, funcs[0])
+			funcname = decodeObject(funcs[0], ret[0], ret[1], ret[2])
+			if funcname is None:
+				return list(ret)[:2]
+			newfuncname = findAllInPath(path, funcname)
+			newTypename = getTypeFromFuncReturn(newfuncname[0], newfuncname[1])
+			if len(newTypename) > 0:
+				funcs[0] = newTypename[0]
+				ret = findAllFuncs(path, funcs)
+	elif len(funcs) == 1:
+		ret = findAllInPath(path, funcs[0])
+	else:
+		r = findAllFuncs(path, funcs[:2])
+		# stat()
+		# openFileAndLine("tabnew", r[0], r[1])
+		# print r, funcs
+		if ret is not None:
+			# print decodeObject(funcs[0], ret[0], ret[1], ret[2])
+			pass
+
+	if ret is not None:
+		return list(ret[:2])
 
 	print path, funcs
-	print "can't find reference"
+
+def findAllInPath(path, name, do=["tfunc", "func", "type", "var"]):
+	lino = None
+	if name.find(".") > 0 and "tfunc" in do:
+		typename = "tfunc"
+		name = name.split(".")
+		filename, lino = findFuncInPath(path, name[1], name[0])
+	
+	if lino is None and "func" in do:
+		typename = "func"
+		filename, lino = findFuncInPath(path, name)
+
+	if lino is None and "type" in do:
+		typename = "type"
+		filename, lino = findTypeInPath(path, name)
+
+	if lino is None and "var" in do:
+		typename = "var"
+		filename, lino = findVar(path, name)
+
+	if lino is not None:
+		return filename, lino, typename
+
+def decodeObject(name, path, line, typename):
+	f = open(path, "r")
+	data = f.read().split("\n")[line]
+	f.close()
+	if typename == "var":
+		data = data[data.find("=")+1:data.rfind("(")].strip()
+		return data
+	if typename == "func":
+		return getTypeFromFuncReturn(path, line)
+	
+	if typename == "tfunc":
+		return getTypeFromFuncReturn(path, line)
+	
+	print "undo decodeObject", typename
+
+def getTypeOfVarOrFuncArgs(argname, curbuf=vim.current.buffer, eofpackage=True):
+	cursor = vim.current.window.cursor
+	
+	''' recvr '''
+	func_arg = findInBuffer(r"func\s+\(%s\s\**(?:\[\])*(.+?)\)" % (argname), curbuf[ :cursor[0]-1])
+	if len(func_arg) > 0:
+		return func_arg[-1]
+	
+	''' 函数参数 '''
+	func_arg = findInBuffer(r"func.+?%s[^\w]+(\w+)" % (argname), curbuf[ :cursor[0]-1])
+	if len(func_arg) > 0:
+		return func_arg[-1]
+	
+	''' 变量 '''
+	allvar = findInBuffer(r"(.*?\b%s\b[^=]*?)(:?)=([^\(]+)" % (argname), curbuf[ :cursor[0]-1])
+	if len(allvar) > 0:
+		var = allvar[-1]
+		
+		argindex = 0
+		for i in var[0].split(","):
+			if i.strip() == argname:
+				break
+			argindex += 1
+		args = var[2].strip().split('.')
+		
+		# print cursor[0]
+		if not findPackage(args[0]):
+			for i, b in enumerate(curbuf):
+				if b.startswith("%s%s=%s" % var):
+					break
+			if i > 0:
+				if eofpackage:
+					data = getTypeOfVarOrFuncArgs(args[0], curbuf[:i]) + args[1:]
+					if findPackage(data[0]):
+						path = findPackage(data[0])
+						r = findAllInPath(path, data[-1])
+						t = decodeObject(data[-1], r[0], r[1], r[2])
+						if len(t) > argindex - 1:
+							return [data[0], t[argindex]]
+					return data
+				return i
+		else:
+			path = findPackage(args[0])
+			ret = findAllInPath(path, args[1])
+			data = decodeObject(args[-1], ret[0], ret[1], ret[2])
+			if len(data) > argindex - 1:
+				return [args[0], data[argindex]]
+			return args
+
+
+	
+	return None
+
+def getTypeFromFuncReturn(path, line):
+	f = open(path, "r")
+	data = f.read().split("\n")
+	f.close()
+	c = data[line]
+	i = 0
+	while c.find("{") < 0:
+		i += 1
+		c += data[line+i]
+		if line+i+1 > len(data):
+			return []
+	cm = re.findall(r"func\s*(?:\([^\)]+\))?[\w_\d]+\([^\)]+\)", c)
+	if len(cm) > 0:
+		c = c[len(cm[0]): c.rfind("{")].strip()
+	if c.rfind("(") >= 0:
+		c = c[c.rfind("(")+1:c.rfind(")")]
+	c = c.split(",")
+	ret = []
+	for ic in c:
+		ic = ic.strip()
+		if ic.rfind(" ") > 0:
+			ic = ic[ic.rfind(" ") + 1: ]
+		ic = re.sub(r"^(?:\*|\[\])", "", ic)
+		ret.append(ic)
+	return ret
+
+def findInCurrentPackage(m, funcs):
+	for path, _, filenames in os.walk("."):
+		for filename in filenames:
+			if not isFileNameMatch('%s/%s' % (path, filename)):
+				continue
+			buf = filepathToBuffer('%s/%s' % (path, filename))
+			openmethod = m
+			if filename == vimlib.GetCurrentFileName():
+				openmethod = ""
+				filename=""
+
+			if len(funcs) > 1:
+				ret = findFuncInBuffer(funcs[0], funcs[1], buf, filename)
+				if ret is not None:
+					return openmethod, ret[0], ret[1]
+
+			if len(funcs) == 1:
+				ret = findTypeInBuffer(funcs[0], buf, filename)
+				if ret is not None:
+					return openmethod, ret[0], ret[1]
+
+				ret = findFuncInBuffer("", funcs[0], buf, filename)
+				if ret is not None:
+					return openmethod, ret[0], ret[1]
+
+	return None
+
+def findInBuffer(find, buf):
+	rets = []
+	re_f = re.compile(find)
+	buf = "\n".join(buf)
+	ret = re_f.findall(buf)
+	return ret
 
 def findVar(fpath, varName):
 	for p, _, dirs in os.walk(fpath):
@@ -65,12 +237,12 @@ def findVar(fpath, varName):
 			f = open(path, "r")
 			data = f.read().split("\n")
 			f.close()
-			
+
 			vals = makeValName(data)
 			line = [i[0] for i in vals if i[1] == varName]
 			if len(line) == 1:
 				return path, line[0]
-			
+
 	return None, None
 
 def isFileNameMatch(filename):
@@ -99,7 +271,7 @@ def findTypeInPath(fpath, typeName):
 		for d in dirs:
 			path = "%s/%s" % (p, d)
 			data = filepathToBuffer(path)
-			
+
 			ret = findTypeInBuffer(typeName, data, path)
 			if ret is None:
 				continue
@@ -126,7 +298,7 @@ def findFuncInPath(fpath, funcname, rectr=""):
 			if ret is None:
 				continue
 			return ret
-			 	
+
 	return None, None
 
 def findFuncInBuffer(rectr, funcname, buffer, path=""):
@@ -147,7 +319,7 @@ def makeTypeName(data):
 		line = data[i]
 		if not line.startswith("type "):
 			continue
-		
+
 		line = line[5: ]
 		if line.find(" ") < 0:
 			continue
@@ -157,28 +329,28 @@ def makeTypeName(data):
 
 def makeFuncsName(buffer):
 	names = {}
-	aa = r'func \(([^\)]+)\) ([^\(]+)'
+	aa = r'func \(.+?\s+(?:\*|\[\])*([^\)]+)\) ([^\(]+)'
 	ab = r'func ([\w_]+)'
-	
+
 	for i in range(0, len(buffer)):
 		line = buffer[i]
 		if not line.startswith('func'):
 			continue
-		
+
 		ret = re.findall(aa, line)
 		if len(ret) == 0:
 			ret = re.findall(ab, line)
-		
+
 		if isinstance(ret[0], str):
 			key = ''
 			value = ret[0]
 		else:
 			key = ret[0][0]
 			value = ret[0][1]
-		
+
 		if not key in names:
 			names[key] = []
-		
+
 		names[key].append((i, value))
 
 	return names
@@ -187,6 +359,7 @@ def makeFuncsName(buffer):
 def findPackage(packageName):
 	''' 根据指定包名来确定相对路径 '''
 
+	print packageName
 	s, e = getImportLineNoRange()
 	for i in range(s, e):
 		pkg = vim.current.buffer[i].strip()
@@ -194,10 +367,10 @@ def findPackage(packageName):
 			pkg = pkg[1: -1]
 		if pkg.startswith("%s " % packageName):
 			return getPackageDirPath(pkg[len(packageName + 1) + 1: -1])
-		if pkg.endswith(packageName):
+		if pkg == packageName or pkg.endswith("/"+packageName):
 			return getPackageDirPath(pkg)
 	return None
-			
+
 def getPackageDirPath(import_path):
 	for path in vimlib.GOPATH:
 		if len(path) > 0:
@@ -209,31 +382,57 @@ def getPackageDirPath(import_path):
 				return p
 	return None
 
-def getImportLineNoRange():
+def getNodeStrings(node="import", buf=vim.current.buffer):
+	ret = getNodeLineRange(node, 0)
+	for i in ret:
+		b = buf[i].strip()
+		if b.startswith(node) and b.endswith(")"):
+			b = b[b.find("(")+1: -1]
+		print b
+
+def getNodeLineRange(node, start=0, buf=vim.current.buffer):
 	''' 得到该文件 import 的行数范围 '''
-	
-	lineCount = len(vim.current.buffer)
+
+	lineCount = len(buf)
 	importStartLine = -1
 	importEndLine = -1
-	for i in range(0, lineCount):
-		if vim.current.buffer[i].strip().startswith('import'):
+	for i in range(start, lineCount):
+		if buf[i].strip().startswith(node):
+			if buf[i].strip().endswith(")") and len(buf[i].strip()) > len(node)+2:
+				importStartLine = i
+				importEndLine = i+1
+				break
 			importStartLine = i + 1
-		if importStartLine >= 0 and vim.current.buffer[i].strip().startswith(')'):
+		if importStartLine >= 0 and buf[i].strip().startswith(')'):
 			importEndLine = i
 			break
-	return importStartLine, importEndLine
+	if importStartLine == -1 or importEndLine == -1:
+		return []
 
-def openFileAndLine(method, filePath, lineNo):
+	newret = getNodeLineRange(node, importEndLine)
+	newret = range(importStartLine, importEndLine) + newret
+	if len(newret) == 0:
+		return newret
+	return newret
+
+def openFileAndLine(method, filePath, lineNo, funcname=None):
 	''' 打开指定文件并跳转到行号 '''
 	cmd = "%s %s" % (method, filePath)
 	if cmd.strip():
 		vim.command(cmd)
-	vim.command("%s" % (lineNo + 1))
+	if lineNo is not None:
+		vim.command("%s" % (lineNo + 1))
 	vim.press("zz")
+	
+	l = vimlib.GetCurrentCursorLine()
+	if funcname is not None:
+		if l.find(funcname) >= 0:
+			cur = vim.current.window.cursor
+			vim.current.window.cursor = (cur[0], l.find(funcname))
 
 def getFuncsFromCur():
 	''' 将指针所指向的一系列命令进行格式化 '''
-	
+
 	buf = vim.current.line
 	cur = vim.current.window.cursor[1]
 	r = []
@@ -249,11 +448,11 @@ def getFuncsFromCur():
 				r.append(tmp_r)
 			break
 		tmp_r = buf[i] + tmp_r
-	
+
 	for i in range(cur + 1, len(buf)):
 		if buf[i] in "( \n.,):}{":
 			break
-		
+
 		if len(r) > 0:
 			r[0] += buf[i]
 	r = r[::-1]

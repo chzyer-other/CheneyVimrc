@@ -11,9 +11,11 @@ set colorcolumn=80 " 提示单行最为80字符
 set guifont=monaco " 设置字体
 set autochdir " 自动cd进当前目录
 set number " 显示行号
-set nobackup 
+set nobackup
 set noswapfile " 不生成swp文件
 set clipboard=unnamed " 使用系统的剪贴板
+set noimdisable " normal-mode自动不使用输入法
+set hlsearch
 
 " 配色方案
 syntax enable
@@ -29,10 +31,11 @@ map th hxp
 map tl xph
 map <D-r> :call Run()<cr>
 map <D-O> s<cr><Esc>
-map <tab> i<tab><Esc>
-map <S-tab> x
+map <tab> I<tab><Esc>
+map <S-tab> I<delete><Esc>
 vmap <tab> I<tab><Esc>
-vmap <S-tab> x
+vmap <S-tab> I<delete><Esc>
+
 vmap ' call AddQuote()
 map <BackSpace> X
 map <C-h> <BackSpace>
@@ -47,6 +50,7 @@ imap <D-cr> <S-cr>
 imap <D-S-cr> <Esc>O
 imap <D-O> <D-S-cr>
 imap <S-cr> <Esc>o
+imap ／ /
 map <D-[> <C-w>h
 map <D-]> <C-w>l
 map <D-k> :call Help()<cr>
@@ -95,15 +99,20 @@ function! RestoreSession()
 	end
 endfunction
 
-highlight WhitespaceEOL ctermbg=red guibg=red
-match WhitespaceEOL /\s\+$/
+" autocmd ColorScheme * highlight IntendSpend ctermbg=red guibg=#073642
+" match IntendSpend /\t/
+
+set list
+set listchars=tab:⋮\ ,nbsp:·,trail:·
+
+" autocmd BufWinLeave * call clearmatches()
 
 " 即时运行
 function! Run()
 python << EOF
 vimlib.Run()
 EOF
-endfunction 
+endfunction
 
 " 即时编译
 function! Build()
