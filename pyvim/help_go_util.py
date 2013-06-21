@@ -6,11 +6,16 @@ import re
 
 def run(m, buf):
 	cursor = vim.current.window.cursor
-	if cursor[0] in getNodeLineRange("import"):
+	if cursor[0]-1 in getNodeLineRange("import"):
 		''' 指针在 import 内 '''
 		l = vimlib.GetCurrentCursorLine()
 		l = l[l.find('"')+1: l.rfind('"')]
-		vim.command("%s %s" % (m, getPackageDirPath(l)))
+		package_path = getPackageDirPath(l)
+		if package_path is None:
+			print "package path not found"
+			return
+		# vim.press("#")
+		vim.command("%s %s" % (m, package_path))
 		return
 
 	funcs = getFuncsFromCur()
@@ -19,6 +24,7 @@ def run(m, buf):
 		print "con't find reference"
 		return
 
+	# vim.press("#")
 	m, filename, lino = ret
 	openFileAndLine(m, filename, lino, funcs[-1])
 
@@ -358,15 +364,11 @@ def makeFuncsName(buffer):
 
 def findPackage(packageName):
 	''' 根据指定包名来确定相对路径 '''
-
-	print packageName
-	s, e = getImportLineNoRange()
-	for i in range(s, e):
-		pkg = vim.current.buffer[i].strip()
+	for pkg in getNodeStrings("import"):
 		if pkg.startswith('"') and pkg.endswith('"'):
 			pkg = pkg[1: -1]
 		if pkg.startswith("%s " % packageName):
-			return getPackageDirPath(pkg[len(packageName + 1) + 1: -1])
+			return getPackageDirPath(pkg[pkg.find('"')+1: -1])
 		if pkg == packageName or pkg.endswith("/"+packageName):
 			return getPackageDirPath(pkg)
 	return None
@@ -384,11 +386,13 @@ def getPackageDirPath(import_path):
 
 def getNodeStrings(node="import", buf=vim.current.buffer):
 	ret = getNodeLineRange(node, 0)
+	r = []
 	for i in ret:
 		b = buf[i].strip()
 		if b.startswith(node) and b.endswith(")"):
 			b = b[b.find("(")+1: -1]
-		print b
+		r.append(b)
+	return r
 
 def getNodeLineRange(node, start=0, buf=vim.current.buffer):
 	''' 得到该文件 import 的行数范围 '''
@@ -443,7 +447,7 @@ def getFuncsFromCur():
 				r.append(tmp_r)
 			tmp_r = ""
 			continue
-		if buf[i] in " \t&({":
+		if buf[i] in " \t&({!":
 			if len(tmp_r) > 0:
 				r.append(tmp_r)
 			break

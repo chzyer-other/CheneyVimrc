@@ -11,8 +11,8 @@ def test_go():
 	name = package[package.rfind(' ')+1: ]
 	if name.endswith('_test'):
 		name = name[:-5]
-	cmdInstall = 'go test -i ../%s' % name
-	cmd = 'go test ../%s' % name
+	cmdInstall = 'go test -i .'
+	cmd = 'go test .'
 	test_yml_name = ".travis.yml"
 	path = vimlib.GetCurrentPath()
 	commands = []

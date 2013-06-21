@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import os
 
 for i in os.environ:
@@ -9,6 +10,93 @@ home = os.environ['HOME']
 GOROOT = "/usr/local/go"
 GOPATH = os.environ.get("GOPATH", "").split(":")
 GOPATH.append(GOROOT)
+
+def Utu():
+	# 将在Upper 和 Underscore间转换
+	spt = ". ()\t\r\n,+-*.[]{}<>"
+	pos = vim.current.window.cursor[1]
+	line = GetCurrentCursorLineAll()
+	start, end = -1, -1
+	for i in range(pos, 0, -1):
+		if line[i] in spt:
+			start = i
+			break
+	if start < 0:
+		start = 0
+	for i in range(pos+1, len(line)):
+		if line[i] in spt:
+			end = i
+			break
+		if i==len(line)-1:
+			end = i+1
+			break
+	def mode1():
+		upper = range(ord('A'), ord('Z'))
+		# af_udfdf adfdJdfd fdf_cdf
+		result = line[:start+1]
+		if ord(line[start+1]) in upper:
+			result += chr(ord(line[start+1])+32)
+		else:
+			result += line[start+1]
+		
+		for i in line[start+2: end]:
+			if ord(i) in upper:
+				i = "_" + chr(ord(i)+32)
+			result += i
+		result += line[end:]
+		return result
+	
+	def mode2():
+		result = line[:start+2]
+		cont = False
+		idx = start+2
+		for i in line[start+2: end]:
+			idx+=1
+			if cont:
+				cont = False
+				continue
+			if i == "_":
+				result += chr(ord(line[idx])-32)
+				cont = True
+				continue
+			result += i
+		result += line[end:]
+		return result
+	
+	func = mode1
+	if line[start+1: end].find("_") > 0:
+		func = mode2
+	vim.current.buffer[vim.current.window.cursor[0]-1] = func()
+
+def SelectWord():
+	spt = ". ()\t\r\n,+-*."
+	pos = vim.current.window.cursor[1]
+	line = GetCurrentCursorLineAll()
+	start, end = -1, -1
+	for i in range(pos, 0, -1):
+		if line[i] in spt:
+			start = i
+			break
+	if start < 0:
+		start = 0
+	for i in range(pos+1, len(line)):
+		if line[i] in spt:
+			end = i
+			break
+			
+		if i==len(line)-1:
+			end = i+1
+			break
+	vim.current.window.cursor = (vim.current.window.cursor[0], start+1)
+	vim.press("v%sl" % (end-start-2))
+	
+
+def CallCompile():
+	func, ok = AutoLoadLibraryFunc("callcompile")
+	if not ok:
+		vim.press("a")
+		return
+	func()
 
 def AddQuote():
 	print vim.current.windows.cursor

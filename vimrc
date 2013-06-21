@@ -14,8 +14,10 @@ set number " 显示行号
 set nobackup
 set noswapfile " 不生成swp文件
 set clipboard=unnamed " 使用系统的剪贴板
-set noimdisable " normal-mode自动不使用输入法
+" set noimdisable " normal-mode自动不使用输入法
 set hlsearch
+source $VIMRUNTIME/menu.vim
+set wildmenu
 
 " 配色方案
 syntax enable
@@ -29,12 +31,15 @@ endif
 " 快捷键绑定
 map th hxp
 map tl xph
-map <D-r> :call Run()<cr>
-map <D-O> s<cr><Esc>
-map <tab> I<tab><Esc>
-map <S-tab> I<delete><Esc>
+map  <D-r> :call Run()<cr>
+map  <tab> I<tab><Esc>
+map  <S-tab> I<delete><Esc>
+map <D->> :<up><cr>
+imap <D->> <Esc>:<up><cr>
 vmap <tab> I<tab><Esc>
 vmap <S-tab> I<delete><Esc>
+map ∆ ddp
+map ˚ ddkP
 
 vmap ' call AddQuote()
 map <BackSpace> X
@@ -48,13 +53,38 @@ imap <D-e> <Esc><D-e>
 imap <D-r> <Esc>:call Run()<cr>
 imap <D-cr> <S-cr>
 imap <D-S-cr> <Esc>O
-imap <D-O> <D-S-cr>
+map Ø O
+imap Ø <D-S-cr>
+imap ø <D-cr>
 imap <S-cr> <Esc>o
+imap Ï <Esc>F
+imap ƒ <Esc>f
+imap Î <Esc>lDa
+imap <D-0> <Esc>
+imap <D-2> <Esc>
+vmap <D-0> <Esc>
+vmap <D-2> <Esc>
 imap ／ /
+imap ： :
 map <D-[> <C-w>h
 map <D-]> <C-w>l
+imap <D-[> <Esc><D-[>
+imap <D-]> <Esc><D-]>
 map <D-k> :call Help()<cr>
 map <D-K> :call HelpFinder()<cr>
+map <C-s> :call SelectWord()<CR>
+map ˙     ^
+imap ˙     <Esc>^i
+imap Ó    <Esc>Ó
+imap Ò    <Esc>Ò
+map Ó    I
+map Ò    A
+map ¬     $
+imap ¬     <Esc>$a
+imap ® <Esc>l~i
+map ® ~
+" alt+w
+imap ∑     <Esc>ea
 imap <D-L> <End>
 imap <D-H> <Esc>I
 inoremap <D-u> <C-n>
@@ -68,8 +98,11 @@ inoremap <C-b> <Left>
 inoremap <C-a> <Home>
 inoremap <C-e> <End>
 inoremap <C-d> <Delete>
+inoremap . .<Esc>:call CallCompite()<CR>
+map <C-_> :Utu<CR>
 
 map <D-B> :call Build()<cr>
+imap <D-B> <Esc><D-B>
 map <D-V> :w<cr>:source $MYVIMRC<cr>
 
 map <D-e> :w<cr>:call Test()<cr>
@@ -82,6 +115,8 @@ noremap <S-space> i<space><Esc>l
 command! Weibo execute ":call Weibo()"
 command! Relax execute ":call Relax()"
 command! JTest execute ":call JTest()"
+command! CPath execute ":call CPath()"
+command! Utu   execute ":call Utu()"
 command! Clear call Clear()
 
 " 触发器
@@ -195,5 +230,28 @@ endfunction
 function! AddQuote()
 python << EOF
 vimlib.AddQuote()
+EOF
+endfunction
+
+function! CallCompite()
+python << EOF
+vimlib.CallCompile()
+EOF
+endfunction
+
+function! SelectWord()
+python << EOF
+vimlib.SelectWord()
+EOF
+endfunction
+
+function! CPath()
+exec "!pwd | pbcopy"
+call feedkeys("\<CR>")
+endfunction
+
+function! Utu()
+python << EOF
+vimlib.Utu()
 EOF
 endfunction

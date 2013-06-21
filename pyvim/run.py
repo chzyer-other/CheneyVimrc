@@ -90,7 +90,7 @@ def run_go(remote, arg, other):
 	if file_name.find('_test.go') > 0:
 		isTest = True
 
-	if vim.current.buffer[0].find('main') < 0:
+	if [i for i in vim.current.buffer if i.startswith("package")][0].find('main') < 0:
 		isTest = True
 
 	if isTest:
